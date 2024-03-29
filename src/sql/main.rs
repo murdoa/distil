@@ -13,10 +13,11 @@ use sqlparser::{
     dialect::CustomDialect,
     parser::Parser,
 };
-use std::{collections::HashMap, fmt::{Debug, Binary}};
+use std::{borrow::Borrow, collections::HashMap, fmt::{Binary, Debug}};
 
 use crate::json_math::JsonNumber;
-use crate::sql::types;
+
+use super::types::{QueryAction, QueryContext, QueryTask, SQLLiteral, SelectQuery, QueryType};
 
 fn print_graph<U, V>(graph: &StableDiGraph<U, V>)
 where
@@ -564,20 +565,16 @@ fn execute_query(json_values : &mut Vec<serde_json::Value>, tasks : &Vec<(NodeIn
     Ok(())
 }
 
+pub fn parse_and_execute(sql_statement: String, input_data: &serde_json::Value) {
+    println!("{}", sql_statement);
 
-pub fn sql_main() {
-    let sql_select = "SELECT \n\tpayload.version AS version, \n\tpayload.meta.id AS id, version + 5, \n\tpayload.data.payload AS \"abc\" \nFROM \"/topic\" \nWHERE (version-1) = 0";
-
-    println!("\n\n{}\n", sql_select);
-
-    let _statements = parse_and_compile_sql(sql_select.to_string())
+    let _statements = parse_and_compile_sql(sql_statement.to_string())
         .map_err(|x| println!("Parse and compile error: {}", x))
         .map(|statements| {
             for stmt in statements {
                 match stmt {
                     QueryType::SELECT(mut select_query) => {
 
-                        // println!("{:?}", select_query);
                         // print_graph(&select_query.task_graph);
 
                         let context_res = graph_populate_context(&mut select_query.task_graph);
@@ -642,30 +639,21 @@ pub fn sql_main() {
                         }).map(|&idx| (idx, select_query.task_graph[idx].clone()))
                         .collect();
 
-                        let input_data = serde_json::json!({
-                            "version": 1,
-                            "data": {
-                                "payload": [1,2,3,4,5]
-                            },
-                            "meta": {
-                                "id": 2
-                            }
-                        });
+                        println!("{}", serde_json::to_string_pretty(input_data).unwrap());
 
-                        println!("{}", serde_json::to_string_pretty(&input_data).unwrap());
-
-                        json_values[0] = input_data;
+                        json_values[0] = input_data.clone();
 
                         let execute_res = execute_query(&mut json_values, &tasks).map_err(|x| println!("Error executing query {:?}", x));
-                        
+                    
                         if execute_res.is_err() {
                             println!("Error executing query: {:?}", execute_res.unwrap_err());
                         }
 
-
                         println!("\nQuery results:");
                         for (i, select_item) in select_query.select_items.iter().enumerate() {
-                            println!("\t{:?} {:?}", i, json_values[select_item.index()]);
+                            println!("\t{:?} -> {:?}", 
+                                select_query.task_graph.node_weight(*select_item).map_or(i.to_string(), |x| x.alias.clone().unwrap_or(i.to_string())) , 
+                                json_values[select_item.index()]);
                         }
                         println!("\tWHERE: {:?}", json_values[select_query.where_expr.unwrap().index()]);
                     }
