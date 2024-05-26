@@ -1,4 +1,4 @@
-use sqlparser::{ast::{SetExpr, Statement}, dialect::CustomDialect, parser::{Parser, ParserError}, tokenizer::TokenizerError};
+use sqlparser::{ast::{SetExpr, Statement}, dialect::CustomDialect, parser::{Parser, ParserError}};
 
 use super::{types::Query, builder::build_select_query};
 
