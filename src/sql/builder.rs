@@ -1,7 +1,7 @@
 use petgraph::graph::NodeIndex;
-use sqlparser::ast::{self, ForeachStatement, GroupByExpr, Query, SetExpr, Statement};
+use sqlparser::ast::{self, ForeachStatement, GroupByExpr};
 use super::graph;
-use super::types::{BuiltQuery, BuiltQueryForeach, QuerySelect};
+use super::types::{BuiltQueryForeach, QuerySelect};
 use super::{types::{BuiltQuerySelect, QueryTask, TaskAction}, sqlparser_helper::get_table_name};
 
 pub fn build_select_query(select_query: Box<ast::Select>, root_alias: String) -> Result<BuiltQuerySelect, String> { 
