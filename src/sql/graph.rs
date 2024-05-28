@@ -1,9 +1,98 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::write, io::Write};
 
-use petgraph::{graph::NodeIndex, stable_graph::StableDiGraph, visit::{EdgeRef, IntoNodeReferences}};
+
+use base64::prelude::*;
+use graphviz_rust::{attributes::{len, root}, dot_generator::*, dot_structures::*};
+use petgraph::{graph::{self, NodeIndex}, stable_graph::StableDiGraph, visit::{EdgeRef, IntoNodeReferences}};
 use sqlparser::ast::{Expr, SelectItem};
 
 use super::types::{QueryTask, SQLLiteral, TaskAction, TaskContext};
+
+
+pub fn print_graph(task_graph: &StableDiGraph<QueryTask, usize>) {
+    println!("Printing graph");
+
+    if !std::env::var("TERM").unwrap_or_default().contains("xterm-kitty") {
+        println!("Error: Fallback graph printing TERM != xterm-kitty");
+
+        let node_idx = task_graph.node_indices().collect::<Vec<_>>();
+
+        node_idx.iter().for_each(|&idx| {
+            let task = &task_graph[idx];
+            println!("({:?}) {:?}", idx.index(), task.action);
+            let edges = task_graph.edges_directed(idx, petgraph::Direction::Incoming).collect::<Vec<_>>();
+            edges.iter().for_each(|edge| {
+                println!("\t{:?} --> {:?}", edge.source().index(), edge.target().index());
+            });
+        });
+
+        println!("");
+        return;
+    }
+
+    let dot_viz = std::format!("{:?}", petgraph::dot::Dot::with_attr_getters(&task_graph, 
+        &[petgraph::dot::Config::NodeNoLabel, petgraph::dot::Config::EdgeNoLabel],
+        &|_, _| format!("color=white"),
+        &|_, node| format!("color=white, fontcolor=white, label = \"{}\"", format!("({}) {:?}", node.0.index(), node.1.action).replace("\"", "\\\"") )
+    ));
+
+    let graph = graphviz_rust::parse(dot_viz.as_str());
+    if graph.is_err() {
+        std::println!("Error printing graph: {}", graph.unwrap_err());
+        return;
+    }
+    let mut graph = graph.unwrap();
+
+    graph.add_stmt(Stmt::from(GraphAttributes::new("graph", vec![
+        Attribute(Id::Plain("bgcolor".to_string()), Id::Plain("\"#ffffff00\"".to_string())),
+    ])));
+
+    use graphviz_rust::{cmd::Format, printer::PrinterContext};
+    let graph_png = graphviz_rust::exec(
+        graph,
+        &mut PrinterContext::default(),
+        vec![Format::Png.into()],
+    );
+
+    if graph_png.is_err() {
+        std::println!("Error printing graph: {}", graph_png.unwrap_err());
+        return;
+    }
+
+    let graph_png = graph_png.unwrap();
+    let graph_b64 = BASE64_STANDARD.encode(&graph_png);
+    let chunks = graph_b64.as_bytes().chunks(4096).collect::<Vec<_>>();
+    let max_idx = chunks.len() - 1;
+
+    for (i, chunk) in chunks.iter().enumerate() {
+        let out = if i == 0 && i == max_idx {
+            [b"\x1b_Gf=100,a=T;", *chunk, b"\x1b\\"]
+        } else if i == 0 {
+            [b"\x1b_Gf=100,m=1,a=T;", *chunk, b"\x1b\\"]
+        } else if i == max_idx {
+            [b"\x1b_Gm=0;", *chunk, b"\x1b\\"]
+        } else {
+            [b"\x1b_Gm=1;", *chunk, b"\x1b\\"]
+        };
+        
+        // join out
+        let res = std::io::stdout().write_all(&out.concat());
+
+        if res.is_err() {
+            std::println!("Error writing to stdout: {}", res.unwrap_err());
+            return;
+        }
+    }
+
+    println!("");
+
+    if std::io::stdout().flush().is_err() {
+        std::println!("Error flushing stdout");
+        return;
+    }
+    
+
+}
 
 pub fn add_select_item(
     task_graph: &mut StableDiGraph<QueryTask, usize>,
@@ -140,7 +229,7 @@ pub fn add_expr(
     }
 }
 
-pub fn dealias(task_graph: &mut StableDiGraph<QueryTask, usize>) -> Result<(), String> {
+pub fn dealias(task_graph: &mut StableDiGraph<QueryTask, usize>, root_alias: String) -> Result<(), String> {
     let mut aliases = HashMap::<String, NodeIndex>::new();
 
     for (node_idx, task) in task_graph.node_references() {
@@ -165,7 +254,7 @@ pub fn dealias(task_graph: &mut StableDiGraph<QueryTask, usize>) -> Result<(), S
         .unwrap()
         .clone();
 
-    aliases.insert("payload".to_string(), root_node);
+    aliases.insert(root_alias, root_node);
 
     for idx in task_graph.node_indices().collect::<Vec<NodeIndex>>() {
         match &task_graph[idx].action {

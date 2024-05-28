@@ -1,13 +1,14 @@
 use petgraph::graph::NodeIndex;
-use sqlparser::ast::{SetExpr, Statement};
+use sqlparser::ast::{self, ForeachStatement, GroupByExpr, Query, SetExpr, Statement};
 use super::graph;
-use super::types::{QuerySelect, QueryType};
-use super::{types::{Query, QueryTask, TaskAction}, sqlparser_helper::get_table_name};
+use super::types::{BuiltQuery, BuiltQueryForeach, QuerySelect};
+use super::{types::{BuiltQuerySelect, QueryTask, TaskAction}, sqlparser_helper::get_table_name};
 
-pub fn build_select_query(stmt: Statement) -> Result<Query, String> { 
-    let mut query = Query::new(stmt);
+pub fn build_select_query(select_query: Box<ast::Select>, root_alias: String) -> Result<BuiltQuerySelect, String> { 
+    let mut query = BuiltQuerySelect::new();
     let task_graph = &mut query.task_graph;
 
+    // ROOT NODE NEEDS IDX 0 - DO NOT MOVE THIS LINE
     let _root_node = task_graph.add_node(QueryTask {
         alias: None,
         action: TaskAction::Root,
@@ -21,22 +22,6 @@ pub fn build_select_query(stmt: Statement) -> Result<Query, String> {
         required: true,
         context: None,
     });
-
-    let select_query = match query.sql_stmt {
-        Statement::Query(ref sqlquery) => {
-            match &*sqlquery.body {
-                SetExpr::Select(select_query) => Ok(select_query),
-                _ => Err(())
-            }
-        },
-        _ => Err(())
-    };
-
-    if select_query.is_err() {
-        return Err("build_select_query called on wrong query type".to_string());
-    }
-
-    let select_query = select_query.unwrap();
 
     let select_items = select_query
         .projection
@@ -60,7 +45,6 @@ pub fn build_select_query(stmt: Statement) -> Result<Query, String> {
         task_graph.add_edge(*idx, final_node, 1);
     });
 
-
     if where_expr.is_some() {
         task_graph
             .node_weight_mut(where_expr.unwrap())
@@ -69,7 +53,7 @@ pub fn build_select_query(stmt: Statement) -> Result<Query, String> {
         task_graph.add_edge(where_expr.unwrap(), final_node, 1);
     }
 
-    graph::dealias(task_graph)?;
+    graph::dealias(task_graph, root_alias)?;
 
     // Get output aliases names
     select_items
@@ -86,16 +70,71 @@ pub fn build_select_query(stmt: Statement) -> Result<Query, String> {
             }
         });
 
-    query.query_type = Some(QueryType::SELECT(QuerySelect {
+    query.query_select = Some(QuerySelect {
         select_items: select_items,
         from: from_table,
         where_expr: where_expr,
-    }));
-
+    });
 
     // Build execution plan
     query.initalize_execution_context()?;
-
+    graph::print_graph(&query.task_graph);
     Ok(query)
 }
 
+pub fn build_foreach_query(foreach_query: &ForeachStatement) -> Result<BuiltQueryForeach, String> {
+    
+    let main_body_select = Box::new(ast::Select {
+        distinct: None,
+        top: None,
+        projection: vec![foreach_query.select_item.clone()],
+        into: None,
+        from: vec![foreach_query.from_table.clone()],
+        lateral_views: vec![],
+        selection: foreach_query.where_expr.clone(),
+        group_by: GroupByExpr::All,
+        having: None,
+        cluster_by: vec![],
+        distribute_by: vec![],
+        sort_by: vec![],
+        named_window: vec![],
+        qualify: None
+    });
+
+    let return_items_select = match foreach_query.return_items.clone() {
+        Some(items) => items,
+        None => vec![],
+    };
+    
+    let foreach_select = Box::new(ast::Select {
+        distinct: None,
+        top: None,
+        projection: return_items_select,
+        into: None,
+        from: vec![foreach_query.from_table.clone()],
+        lateral_views: vec![],
+        selection: foreach_query.when_expr.clone(),
+        group_by: GroupByExpr::All,
+        having: None,
+        cluster_by: vec![],
+        distribute_by: vec![],
+        sort_by: vec![],
+        named_window: vec![],
+        qualify: None
+    });
+
+    let alias = match &foreach_query.select_item {
+        ast::SelectItem::UnnamedExpr(_) => {
+            Err("Select item must have an alias".to_string())
+        },
+        ast::SelectItem::ExprWithAlias { expr, alias } => {
+            Ok(alias.value.clone())
+        },
+        _ => Err("Select item must have an alias".to_string())
+    }?;
+
+    let main_built =    build_select_query(main_body_select, "payload".to_string())?;
+    let foreach_built = build_select_query(foreach_select, alias)?;
+
+    Ok(BuiltQueryForeach::new(main_built, foreach_built))
+}

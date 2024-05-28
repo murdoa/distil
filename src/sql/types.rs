@@ -1,5 +1,6 @@
 use std::vec;
 
+use serde_json::de;
 use sqlparser::ast::{BinaryOperator, UnaryOperator, Statement};
 
 use petgraph::{
@@ -52,37 +53,56 @@ pub struct QuerySelect {
     pub where_expr: Option<NodeIndex>,
 }
 
-// #[derive(Debug)]
-// pub struct QueryForeach {
-//     arr_expr: NodeIndex,
-//     return_items: Option<Vec<NodeIndex>>,
-//     when_expr: Option<NodeIndex>,
-//     from: String,
-//     where_expr: Option<NodeIndex>,
-// }
+#[derive(Debug)]
+pub struct QueryForeach {
+    arr_expr: NodeIndex,
+    return_items: Option<Vec<NodeIndex>>,
+    when_expr: Option<NodeIndex>,
+    from: String,
+    where_expr: Option<NodeIndex>,
+}
 
 
 #[derive(Debug)]
 pub enum QueryType {
     SELECT(QuerySelect),
-    // FOREACH(QueryForeach),
+    FOREACH(QueryForeach),
 }
 
 #[derive(Debug)]
-pub struct Query {
+pub struct BuiltQuerySelect {
     pub task_graph: StableDiGraph<QueryTask, usize>,
-    pub query_type: Option<QueryType>,
-    pub sql_stmt : Statement,
+    pub query_select: Option<QuerySelect>,
+    pub sql_stmt : Option<Statement>,
     pub tasks: Vec<(NodeIndex, QueryTask)>,
     pub json_context: Vec<serde_json::Value>,
 }
 
-impl Query {
-    pub fn new(sql_stmt: Statement) -> Self {
-        Query {
+#[derive(Debug)]
+pub struct BuiltQueryForeach {
+    pub main : BuiltQuerySelect,
+    pub foreach : BuiltQuerySelect,
+    pub sql_stmt : Option<Statement>,
+}
+
+#[derive(Debug)]
+pub enum BuiltQuery {
+    SELECT(BuiltQuerySelect),
+    FOREACH(BuiltQueryForeach),
+}
+
+#[derive(Debug)]
+pub struct QueryResult {
+    pub result : Vec<(String, serde_json::Value)>,
+    pub cond : Option<serde_json::Value>
+}
+
+impl BuiltQuerySelect {
+    pub fn new() -> Self {
+        BuiltQuerySelect {
             task_graph: StableDiGraph::<QueryTask, usize>::new(),
-            query_type: None,
-            sql_stmt: sql_stmt,
+            query_select: None,
+            sql_stmt: None,
             tasks: vec![],
             json_context: vec![]
         }
@@ -149,36 +169,18 @@ impl Query {
         }).map(|&idx| (idx, self.task_graph[idx].clone()))
         .collect();
 
-
         self.tasks = tasks;
         self.json_context = json_context;
         Ok(())
     }
+}
 
-    pub fn get_results(&mut self) -> Result<(Vec<(String, serde_json::Value)>, Option<serde_json::Value>), String> {
-        match &self.query_type {
-            Some(QueryType::SELECT(select_query)) => {
-                let select_items = &select_query.select_items;
-                let json_context = &self.json_context;
-                let result_tasks = select_items.iter().map(|x| {
-                    let task = &self.task_graph[*x];
-                    let alias = task.alias.clone().unwrap_or("".to_string());
-                    let value = json_context[x.index()].clone();
-                    (alias, value)
-                }).collect::<Vec<_>>();
-
-                let conditional = match &select_query.where_expr {
-                    Some(idx) => {
-                        let value = json_context[idx.index()].clone();
-                        Some(value)
-                    },
-                    None => None
-                };
-
-
-                Ok((result_tasks, conditional))
-            },
-            _ => { Err("Not a select query".to_string()) }
+impl BuiltQueryForeach{
+    pub fn new(main: BuiltQuerySelect, foreach: BuiltQuerySelect) -> Self {
+        BuiltQueryForeach {
+            main: main,
+            foreach: foreach,
+            sql_stmt: None
         }
     }
 }
