@@ -127,7 +127,7 @@ pub fn build_foreach_query(foreach_query: &ForeachStatement) -> Result<BuiltQuer
         ast::SelectItem::UnnamedExpr(_) => {
             Err("Select item must have an alias".to_string())
         },
-        ast::SelectItem::ExprWithAlias { expr, alias } => {
+        ast::SelectItem::ExprWithAlias { expr: _, alias } => {
             Ok(alias.value.clone())
         },
         _ => Err("Select item must have an alias".to_string())

@@ -114,8 +114,7 @@ pub fn execute_query_foreach(query: &mut BuiltQueryForeach, data: &serde_json::V
 pub fn execute_query(query: &mut BuiltQuery, data: &serde_json::Value) -> Result<Vec<Result<QueryResult,String>>, String> {
     match query {
         BuiltQuery::SELECT(select) => Ok(vec![execute_query_select(select, data)]),
-        BuiltQuery::FOREACH(foreach) => execute_query_foreach(foreach, data),
-        _ => Err("Query type not implemented".to_string())
+        BuiltQuery::FOREACH(foreach) => execute_query_foreach(foreach, data)
     }
 }
 

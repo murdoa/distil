@@ -52,22 +52,6 @@ pub struct QuerySelect {
 }
 
 #[derive(Debug)]
-pub struct QueryForeach {
-    arr_expr: NodeIndex,
-    return_items: Option<Vec<NodeIndex>>,
-    when_expr: Option<NodeIndex>,
-    from: String,
-    where_expr: Option<NodeIndex>,
-}
-
-
-#[derive(Debug)]
-pub enum QueryType {
-    SELECT(QuerySelect),
-    FOREACH(QueryForeach),
-}
-
-#[derive(Debug)]
 pub struct BuiltQuerySelect {
     pub task_graph: StableDiGraph<QueryTask, usize>,
     pub query_select: Option<QuerySelect>,
