@@ -1,6 +1,8 @@
 #![warn(clippy::all)]
 
-use crate::sql::types::QueryResult;
+use std::collections::HashMap;
+
+use crate::sql::{schema::{self, SchemaNode}, types::QueryResult};
 
 mod json_math;
 mod sql;
@@ -25,12 +27,28 @@ fn main() {
     let input_data = serde_json::json!({
         "version": 1,
         "data": {
-            "payload": [1,2,3,4,5]
+            "payload": [1,2,3,4,5, "a"]
         },
         "meta": {
             "id": 2
         }
     });
+
+    let input_data_schema =
+        SchemaNode::Object(Some(HashMap::from([
+            ("version".to_string(), SchemaNode::Number),
+            ("data".to_string(), SchemaNode::Object(Some(HashMap::from([
+                ("payload".to_string(), SchemaNode::Array(None))
+            ])))),
+            ("meta".to_string(), SchemaNode::Object(Some(HashMap::from([
+                ("id".to_string(), SchemaNode::Number)
+            ])))),
+            ("abcd".to_string(), SchemaNode::Number)
+        ])));
+
+    println!("Valid Input Data: {}", input_data_schema.validate_json(&input_data));
+
+    let output_schema = vec![SchemaNode::Number];
 
     println!("INPUT SQL:\n{}\n", sql_statement);
     println!("INPUT DATA:\n{}\n", input_data.to_string());
@@ -55,60 +73,14 @@ fn main() {
 
         let res = res.unwrap();
 
-        match res {
-            QueryResult::Simple(simple) => {
-                println!("SELECT");
-                for (key, value) in simple.result {
-                    println!("\t{}: {}", key, value);
-                }
-                if simple.cond.is_some() {
-                    println!("WHERE");
-                    println!("\t{}", simple.cond.unwrap());
-                }
-            }, 
-            QueryResult::Nested(nested) => {
-                println!("FOREACH RETURN");
+        sql::debug::print_query_result(&res);
 
-                let max_column = nested.result.iter().map(|x| {
-                    match x {
-                        Ok(QueryResult::Simple(simple)) => simple.result.len(),
-                        _ => 0
-                    }
-                }).max().unwrap_or(0);
+        let valid = match res {
+            QueryResult::Simple(simple) => vec![schema::validate_simple_query_result(&output_schema, &simple)],
+            QueryResult::Nested(nested) => schema::validate_nested_query_result(&output_schema, &nested)
+        };
 
-
-                print!("\t|{:8}", " INDEX");
-                (0..max_column).for_each(|i| print!("|{:8}|{:8}", i, " ALIAS"));
-                println!("|{:8}|", " COND");
-
-                print!("\t");
-                (0..(max_column * 2 + 2) * 9 + 1).for_each(|_| print!("="));
-                print!("\n");
-
-                for (i, res) in nested.result.iter().enumerate() {
-                    print!("\t|{:8}|", i);
-                    match res {
-                        Ok(QueryResult::Simple(simple)) => {
-                            for (key, value) in &simple.result {
-                                print!("{:8}|{:8}|", format!("{}",value), key);
-                            }
-                            println!("{:8}|", format!("{}", simple.cond.clone().unwrap_or(serde_json::Value::Null)));
-                        },
-                        Err(e) => {
-                            println!("Error: {}|", e);
-                        },
-                        _ => {
-                            println!("Error: Nested query must return simple result|");
-                        }
-                    }
-                }
-
-                if nested.cond.is_some() {
-                    println!("WHERE");
-                    println!("\t{}", nested.cond.unwrap());
-                }
-            }
-        }
+        println!("Output Valid: {:?}", valid);
         
     }
 }

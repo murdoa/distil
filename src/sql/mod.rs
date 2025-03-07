@@ -1,10 +1,12 @@
-mod main;
-mod graph;
-mod parsing;
+pub mod main;
+pub mod graph;
+pub mod parsing;
+pub mod debug;
 pub mod types;
-mod builder;
-mod sqlparser_helper;
-mod execute;
+pub mod builder;
+pub mod sqlparser_helper;
+pub mod execute;
+pub mod schema;
 
 #[cfg(test)]
 mod tests;
