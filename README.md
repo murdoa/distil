@@ -34,9 +34,9 @@ JSON Input Data
 ```
 Query results
 ```
-	"version" -> Number(1)
-	"id" -> Number(2)
-	"2" -> Number(6)
-	"abc" -> Array [Number(1), Number(2), Number(3), Number(4), Number(5)]
-	WHERE: Bool(true)
+"version" -> Number(1)
+"id" -> Number(2)
+"2" -> Number(6)
+"abc" -> Array [Number(1), Number(2), Number(3), Number(4), Number(5)]
+WHERE: Bool(true)
 ```
