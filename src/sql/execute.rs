@@ -1,9 +1,9 @@
 use serde_json::Number;
 use sqlparser::ast::{BinaryOperator, UnaryOperator};
 
-use crate::json_math::JsonNumber;
+use crate::{json_math::JsonNumber, sql::types::NestedQueryResult};
 
-use super::types::{BuiltQuery, BuiltQueryForeach, BuiltQuerySelect, QueryResult, TaskAction, TaskContext};
+use super::types::{BuiltQuery, BuiltQueryForeach, BuiltQuerySelect, QueryResult, SimpleQueryResult, TaskAction, TaskContext};
 
 pub fn get_results(query: &mut BuiltQuerySelect) -> Result<QueryResult, String> {
     let query_select = match &query.query_select {
@@ -27,10 +27,10 @@ pub fn get_results(query: &mut BuiltQuerySelect) -> Result<QueryResult, String> 
         None => None
     };
 
-    Ok(QueryResult {
+    Ok(QueryResult::Simple(SimpleQueryResult {
         result: result_tasks,
         cond: conditional
-    })
+    }))
 }
 
 pub fn execute_query_select(query: &mut BuiltQuerySelect, data: &serde_json::Value) -> Result<QueryResult, String> {
@@ -79,13 +79,19 @@ pub fn execute_query_select(query: &mut BuiltQuerySelect, data: &serde_json::Val
     get_results(query)
 }
 
-pub fn execute_query_foreach(query: &mut BuiltQueryForeach, data: &serde_json::Value) -> Result<Vec<Result<QueryResult, String>>,String> {
-    let mut results = Vec::new();
+pub fn execute_query_foreach(query: &mut BuiltQueryForeach, data: &serde_json::Value) -> Result<QueryResult,String> {
+    let query_result = match execute_query_select(&mut query.main, data)? {
+        QueryResult::Simple(simple) => Ok(simple),
+        _ => Err("Foreach query must return simple result".to_string())
+    }?;
 
-    let query_result = execute_query_select(&mut query.main, data)?;
+    if query_result.cond.is_some() && !query_result.cond.as_ref().unwrap().as_bool().unwrap_or(true) {
+        let result = QueryResult::Nested(NestedQueryResult {
+            result: Vec::new(),
+            cond: query_result.cond
+        });
 
-    if query_result.cond.is_some() && !query_result.cond.unwrap().as_bool().unwrap() {
-        return Ok(results);
+        return Ok(result);
     }
 
     if query_result.result.len() != 1 {
@@ -94,8 +100,7 @@ pub fn execute_query_foreach(query: &mut BuiltQueryForeach, data: &serde_json::V
     
     let res = query_result.result[0].1.clone();
 
-    println!("Foreach result: {:?}", res);
-
+    let mut results = Vec::new();
     match res {
         serde_json::Value::Array(arr) => {
             for item in arr {
@@ -108,12 +113,15 @@ pub fn execute_query_foreach(query: &mut BuiltQueryForeach, data: &serde_json::V
         }
     }
 
-    Ok(results)
+    Ok(QueryResult::Nested(NestedQueryResult {
+        result: results,
+        cond: query_result.cond
+    }))
 }
 
-pub fn execute_query(query: &mut BuiltQuery, data: &serde_json::Value) -> Result<Vec<Result<QueryResult,String>>, String> {
+pub fn execute_query(query: &mut BuiltQuery, data: &serde_json::Value) -> Result<QueryResult, String> {
     match query {
-        BuiltQuery::SELECT(select) => Ok(vec![execute_query_select(select, data)]),
+        BuiltQuery::SELECT(select) => execute_query_select(select, data),
         BuiltQuery::FOREACH(foreach) => execute_query_foreach(foreach, data)
     }
 }

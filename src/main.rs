@@ -1,5 +1,9 @@
 #![warn(clippy::all)]
 
+use sqlparser::ast::Query;
+
+use crate::sql::types::QueryResult;
+
 mod json_math;
 mod sql;
 
@@ -53,14 +57,47 @@ fn main() {
 
         let res = res.unwrap();
 
-        for row in res {
-            if row.is_err() {
-                println!("Error: {}", row.unwrap_err());
-                continue;
-            }
+        match res {
+            QueryResult::Simple(simple) => {
+                println!("SELECT");
+                for (key, value) in simple.result {
+                    println!("\t{}: {}", key, value);
+                }
+                if simple.cond.is_some() {
+                    println!("WHERE");
+                    println!("\t{}", simple.cond.unwrap());
+                }
+            }, 
+            QueryResult::Nested(nested) => {
+                println!("FOREACH");
 
-            let row = row.unwrap();
-            println!("RESULT: {:?}", row);
+                for (i, res) in nested.result.iter().enumerate() {
+                    println!("\tITEM {}", i);
+                    match res {
+                        Ok(QueryResult::Simple(simple)) => {
+                            for (key, value) in &simple.result {
+                                println!("\t\t{}: {}", key, value);
+                            }
+                            if simple.cond.is_some() {
+                                println!("\tWHEN");
+                                println!("\t\t{}", simple.cond.clone().unwrap());
+                            }
+                        },
+                        Err(e) => {
+                            println!("Error: {}", e);
+                        },
+                        _ => {
+                            println!("Error: Nested query must return simple result");
+                        }
+                    }
+                }
+
+                if nested.cond.is_some() {
+                    println!("WHERE");
+                    println!("\t{}", nested.cond.unwrap());
+                }
+            }
         }
+        
     }
 }

@@ -74,9 +74,21 @@ pub enum BuiltQuery {
 }
 
 #[derive(Debug)]
-pub struct QueryResult {
+pub struct SimpleQueryResult {
     pub result : Vec<(String, serde_json::Value)>,
     pub cond : Option<serde_json::Value>
+}
+
+#[derive(Debug)]
+pub struct NestedQueryResult {
+    pub result : Vec<Result<QueryResult, String>>,
+    pub cond : Option<serde_json::Value>
+}
+
+#[derive(Debug)]
+pub enum QueryResult {
+    Simple(SimpleQueryResult),
+    Nested(NestedQueryResult),
 }
 
 impl BuiltQuerySelect {
