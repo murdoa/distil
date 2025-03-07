@@ -1,7 +1,5 @@
 #![warn(clippy::all)]
 
-use sqlparser::ast::Query;
-
 use crate::sql::types::QueryResult;
 
 mod json_math;
@@ -69,25 +67,38 @@ fn main() {
                 }
             }, 
             QueryResult::Nested(nested) => {
-                println!("FOREACH");
+                println!("FOREACH RETURN");
+
+                let max_column = nested.result.iter().map(|x| {
+                    match x {
+                        Ok(QueryResult::Simple(simple)) => simple.result.len(),
+                        _ => 0
+                    }
+                }).max().unwrap_or(0);
+
+
+                print!("\t|{:8}", " INDEX");
+                (0..max_column).for_each(|i| print!("|{:8}|{:8}", i, " ALIAS"));
+                println!("|{:8}|", " COND");
+
+                print!("\t");
+                (0..(max_column * 2 + 2) * 9 + 1).for_each(|_| print!("="));
+                print!("\n");
 
                 for (i, res) in nested.result.iter().enumerate() {
-                    println!("\tITEM {}", i);
+                    print!("\t|{:8}|", i);
                     match res {
                         Ok(QueryResult::Simple(simple)) => {
                             for (key, value) in &simple.result {
-                                println!("\t\t{}: {}", key, value);
+                                print!("{:8}|{:8}|", format!("{}",value), key);
                             }
-                            if simple.cond.is_some() {
-                                println!("\tWHEN");
-                                println!("\t\t{}", simple.cond.clone().unwrap());
-                            }
+                            println!("{:8}|", format!("{}", simple.cond.clone().unwrap_or(serde_json::Value::Null)));
                         },
                         Err(e) => {
-                            println!("Error: {}", e);
+                            println!("Error: {}|", e);
                         },
                         _ => {
-                            println!("Error: Nested query must return simple result");
+                            println!("Error: Nested query must return simple result|");
                         }
                     }
                 }
