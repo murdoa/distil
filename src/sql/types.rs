@@ -1,6 +1,4 @@
 use std::vec;
-
-use serde_json::de;
 use sqlparser::ast::{BinaryOperator, UnaryOperator, Statement};
 
 use petgraph::{

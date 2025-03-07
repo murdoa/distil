@@ -1,9 +1,9 @@
-use std::{collections::HashMap, fmt::write, io::Write};
+use std::{collections::HashMap, io::Write};
 
 
 use base64::prelude::*;
-use graphviz_rust::{attributes::{len, root}, dot_generator::*, dot_structures::*};
-use petgraph::{graph::{self, NodeIndex}, stable_graph::StableDiGraph, visit::{EdgeRef, IntoNodeReferences}};
+use graphviz_rust::dot_structures::{Attribute, GraphAttributes, Id, Stmt};
+use petgraph::{graph::NodeIndex, stable_graph::StableDiGraph, visit::{EdgeRef, IntoNodeReferences}};
 use sqlparser::ast::{Expr, SelectItem};
 
 use super::types::{QueryTask, SQLLiteral, TaskAction, TaskContext};
