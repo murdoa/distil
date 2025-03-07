@@ -2,8 +2,6 @@
 mod types;
 mod func;
 mod build;
-// mod sql;
+mod main;
 
-pub fn sql_main() {
-    println!("Hello world");
-}
+pub use main::parse_and_execute;

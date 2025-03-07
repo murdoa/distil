@@ -43,10 +43,10 @@ pub struct QueryTask {
 
 #[derive(Debug)]
 pub struct SelectQuery {
-    task_graph: StableDiGraph<QueryTask, usize>,
-    select_items: Vec<NodeIndex>,
-    from_table: String,
-    where_expr: Option<NodeIndex>,
+    pub task_graph: StableDiGraph<QueryTask, usize>,
+    pub select_items: Vec<NodeIndex>,
+    pub from_table: String,
+    pub where_expr: Option<NodeIndex>,
 }//
 
 #[derive(Debug)]
