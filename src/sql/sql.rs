@@ -16,58 +16,7 @@ use sqlparser::{
 use std::{collections::HashMap, fmt::{Debug, Binary}};
 
 use crate::json_math::JsonNumber;
-
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-enum SQLLiteral {
-    Integer(i64),
-    Float(f64),
-    String(String),
-}
-
-#[derive(Debug)]
-enum QueryFunctions {}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-enum QueryAction {
-    Literal(SQLLiteral),
-    Link,
-    Accessor(Vec<String>),
-    UnaryOp(UnaryOperator),
-    BinaryOp(BinaryOperator),
-    Function(String),
-    Root,
-    Finalize,
-    Stale,
-}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-enum QueryContext {
-    SingleParent(NodeIndex),
-    DualParent(NodeIndex, NodeIndex),
-    MultiParent(Vec<NodeIndex>),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-struct QueryTask {
-    alias: Option<String>,
-    action: QueryAction,
-    required: bool,
-    context: Option<QueryContext>,
-}
-
-#[derive(Debug)]
-struct SelectQuery {
-    task_graph: StableDiGraph<QueryTask, usize>,
-    select_items: Vec<NodeIndex>,
-    from_table: String,
-    where_expr: Option<NodeIndex>,
-}//
-
-#[derive(Debug)]
-enum QueryType {
-    SELECT(SelectQuery),
-}
+use crate::sql::types;
 
 fn print_graph<U, V>(graph: &StableDiGraph<U, V>)
 where
