@@ -22,7 +22,7 @@ pub fn build_select_query(stmt: Statement) -> Result<Query, String> {
         context: None,
     });
 
-    let mut select_query = match query.sql_stmt {
+    let select_query = match query.sql_stmt {
         Statement::Query(ref sqlquery) => {
             match &*sqlquery.body {
                 SetExpr::Select(select_query) => Ok(select_query),
@@ -36,7 +36,7 @@ pub fn build_select_query(stmt: Statement) -> Result<Query, String> {
         return Err("build_select_query called on wrong query type".to_string());
     }
 
-    let mut select_query = select_query.unwrap();
+    let select_query = select_query.unwrap();
 
     let select_items = select_query
         .projection

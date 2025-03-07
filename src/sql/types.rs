@@ -1,4 +1,3 @@
-use core::task;
 use std::vec;
 
 use sqlparser::ast::{BinaryOperator, UnaryOperator, Statement};
@@ -25,7 +24,7 @@ pub enum TaskAction {
     Accessor(Vec<String>),
     UnaryOp(UnaryOperator),
     BinaryOp(BinaryOperator),
-    Function(String),
+    _Function(String),
     Root,
     Finalize,
     Stale,
@@ -53,20 +52,20 @@ pub struct QuerySelect {
     pub where_expr: Option<NodeIndex>,
 }
 
-#[derive(Debug)]
-pub struct QueryForeach {
-    arr_expr: NodeIndex,
-    return_items: Option<Vec<NodeIndex>>,
-    when_expr: Option<NodeIndex>,
-    from: String,
-    where_expr: Option<NodeIndex>,
-}
+// #[derive(Debug)]
+// pub struct QueryForeach {
+//     arr_expr: NodeIndex,
+//     return_items: Option<Vec<NodeIndex>>,
+//     when_expr: Option<NodeIndex>,
+//     from: String,
+//     where_expr: Option<NodeIndex>,
+// }
 
 
 #[derive(Debug)]
 pub enum QueryType {
     SELECT(QuerySelect),
-    FOREACH(QueryForeach),
+    // FOREACH(QueryForeach),
 }
 
 #[derive(Debug)]
@@ -89,11 +88,11 @@ impl Query {
         }
     }
 
-    pub fn from_idx(&self, node_idx : NodeIndex) -> Option<&QueryTask> {
+    pub fn _from_idx(&self, node_idx : NodeIndex) -> Option<&QueryTask> {
         self.task_graph.node_weight(node_idx)
     }
 
-    pub fn from_idx_mut(&mut self, node_idx : NodeIndex) -> Option<&mut QueryTask> {
+    pub fn _from_idx_mut(&mut self, node_idx : NodeIndex) -> Option<&mut QueryTask> {
         self.task_graph.node_weight_mut(node_idx)
     }
 
@@ -144,7 +143,7 @@ impl Query {
                 TaskAction::Link => true,
                 TaskAction::UnaryOp(_) => true,
                 TaskAction::BinaryOp(_) => true,
-                TaskAction::Function(_) => true,
+                TaskAction::_Function(_) => true,
                 _ => false,
             }
         }).map(|&idx| (idx, self.task_graph[idx].clone()))
@@ -170,7 +169,6 @@ impl Query {
 
                 let conditional = match &select_query.where_expr {
                     Some(idx) => {
-                        let task = &self.task_graph[*idx];
                         let value = json_context[idx.index()].clone();
                         Some(value)
                     },

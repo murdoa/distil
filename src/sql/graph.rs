@@ -261,7 +261,7 @@ pub fn populate_context(task_graph: &mut StableDiGraph<QueryTask, usize>) -> Res
             TaskAction::Link => Some(1),
             TaskAction::UnaryOp(_) => Some(1),
             TaskAction::BinaryOp(_) => Some(2),
-            TaskAction::Function(_) => None,
+            TaskAction::_Function(_) => None,
             _ => Some(0),
         };
 
@@ -294,7 +294,7 @@ pub fn populate_context(task_graph: &mut StableDiGraph<QueryTask, usize>) -> Res
             TaskAction::BinaryOp(_) => {
                 task_graph[idx].context = Some(TaskContext::DualParent(source_indexes[0], source_indexes[1]));
             },
-            TaskAction::Function(_) => {
+            TaskAction::_Function(_) => {
                 task_graph[idx].context = Some(TaskContext::MultiParent(source_indexes));
             }
             _ => {}
@@ -324,7 +324,7 @@ pub fn populate_context(task_graph: &mut StableDiGraph<QueryTask, usize>) -> Res
 }
 
 pub fn toposort(task_graph: &StableDiGraph<QueryTask, usize>) -> Result<Vec<NodeIndex>, String> {
-    let mut sorted = petgraph::algo::toposort(task_graph, None);
+    let sorted = petgraph::algo::toposort(task_graph, None);
     if sorted.is_err() {
         return Err("Error sorting graph".to_string());
     }
